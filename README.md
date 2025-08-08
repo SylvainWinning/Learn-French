@@ -16,7 +16,6 @@ Build for production (used by GitHub Pages):
 ```bash
 npm run build
 ```
-
 After pushing to `main`, GitHub Actions runs `pages.yml` to build and deploy.
 If the deployed page only shows the repository name, make sure the workflow
 completed successfully and that Pages is configured to use **GitHub Actions**

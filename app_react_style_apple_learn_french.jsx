@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { BookOpen, Gamepad2, BarChart2, Settings, Volume2, Play, Pause, RotateCcw, CheckCircle2, Sun, Moon, MonitorSmartphone, Accessibility } from "lucide-react";
+import { BookOpen, Gamepad2, BarChart2, Settings, Volume2, Play, Pause, RotateCcw, CheckCircle2, Sun, Moon, MonitorSmartphone } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, Tooltip as RTooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 
 const TODAY = () => {
@@ -63,6 +63,7 @@ const STR = {
     themeDark: "Dark",
     highRead: "High readability",
     emptyVocab: "No words yet",
+    tagline: "Learn French without friction. Better every day.",
   },
   fr: {
     appTitle: "Learn French for Masha",
@@ -112,6 +113,7 @@ const STR = {
     themeDark: "Sombre",
     highRead: "Haute lisibilité",
     emptyVocab: "Aucun mot pour l'instant",
+    tagline: "Apprends le français sans friction. Un peu mieux chaque jour.",
   },
 };
 
@@ -264,6 +266,7 @@ function useThemeAccent() {
     savePrefs(prefs);
     const root = document.documentElement;
     root.style.setProperty('--accent', prefs.accent || ACCENT_DEFAULT);
+    root.style.setProperty('--accent-2', '#34C759');
     root.style.setProperty('--radius', '12px');
     root.style.setProperty('--shadow-sm', '0 1px 0 rgba(0,0,0,0.06)');
     root.style.setProperty('--shadow-md', '0 8px 20px rgba(0,0,0,0.06)');
@@ -372,17 +375,6 @@ function AppShell({ children, active, setActive, prefs, t }) {
       </header>
 
       <main className="mx-auto w-full max-w-[980px] px-4 md:px-6 pb-28">
-        <div className="py-8 md:py-12 text-center">
-          <div className="font-semibold" style={{
-            fontSize: "clamp(28px,6vw,48px)",
-            letterSpacing: "-0.02em",
-            background: `linear-gradient(90deg, var(--accent) 0%, #FF6A88 50%, #FF2D55 100%)`,
-            WebkitBackgroundClip: 'text',
-            backgroundClip: 'text',
-            color: 'transparent'
-          }}>Learn better. Every day.</div>
-          <div className="mt-2 text-sm md:text-base" style={{ color: "var(--muted)" }}>Clean UI, quiet motion, strong type. Your French, elevated.</div>
-        </div>
         {children}
       </main>
 
@@ -522,6 +514,7 @@ function MouseCheese({ onEat, onWord, t }) {
   const frameRef = useRef(0);
   const tailRef = useRef([{ x: 5, y: 9 }]);
   const cheeseRef = useRef(randCell());
+  const particlesRef = useRef([]);
   function randCell() { return { x: Math.floor(Math.random() * grid), y: Math.floor(Math.random() * grid) }; }
   const reset = () => { tailRef.current = [{ x: 5, y: 9 }]; dirRef.current = { x: 1, y: 0 }; setScore(0); setRunning(true); };
   useEffect(() => {
@@ -558,7 +551,24 @@ function MouseCheese({ onEat, onWord, t }) {
         if (head.x < 0 || head.y < 0 || head.x >= grid || head.y >= grid) { setRunning(false); return; }
         if (tail.some((p, i) => i && p.x === head.x && p.y === head.y)) { setRunning(false); return; }
         tail.unshift(head);
-        if (head.x === cheeseRef.current.x && head.y === cheeseRef.current.y) { setScore(s => s + 1); cheeseRef.current = randCell(); onEat?.(); onWord?.(); } else { tail.pop(); }
+        if (head.x === cheeseRef.current.x && head.y === cheeseRef.current.y) {
+          setScore(s => s + 1);
+          cheeseRef.current = randCell();
+          onEat?.();
+          onWord?.();
+          const burst = 12;
+          for (let i = 0; i < burst; i++) {
+            particlesRef.current.push({
+              x: head.x + 0.5,
+              y: head.y + 0.5,
+              vx: (Math.random() - 0.5) * 0.7,
+              vy: (Math.random() - 0.5) * 0.7,
+              life: 28
+            });
+          }
+        } else {
+          tail.pop();
+        }
         ctx.clearRect(0, 0, size, size);
         for (let y = 0; y < grid; y++) {
           for (let x = 0; x < grid; x++) {
@@ -573,15 +583,40 @@ function MouseCheese({ onEat, onWord, t }) {
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
         ctx.fillText("🧀", (cheeseRef.current.x + 0.5) * cw, (cheeseRef.current.y + 0.5) * cw);
+
+        const accent = getComputedStyle(document.documentElement).getPropertyValue("--accent") || "#FF2D55";
+        const accent2 = getComputedStyle(document.documentElement).getPropertyValue("--accent-2") || "#34C759";
+
+        particlesRef.current = particlesRef.current.flatMap(pt => {
+          const px = pt.x * cw;
+          const py = pt.y * cw;
+          pt.x += pt.vx;
+          pt.y += pt.vy;
+          pt.life -= 1;
+          if (pt.life <= 0) return [];
+          ctx.globalAlpha = Math.max(0, pt.life / 28);
+          ctx.fillStyle = Math.random() < 0.5 ? accent : accent2;
+          ctx.beginPath();
+          ctx.arc(px, py, cw * 0.12, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.globalAlpha = 1;
+          return [pt];
+        });
+
         tail.forEach((seg, i) => {
           const emoji = i === 0 ? "🐭" : "●";
           if (emoji === "●") {
-            ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue("--accent") || ACCENT_DEFAULT;
+            ctx.globalAlpha = Math.max(0.35, 1 - i * 0.06);
+            ctx.fillStyle = accent;
             ctx.beginPath();
             ctx.arc((seg.x + 0.5) * cw, (seg.y + 0.5) * cw, cw * 0.35, 0, Math.PI * 2);
             ctx.fill();
+            ctx.globalAlpha = 1;
           } else {
+            ctx.shadowColor = accent;
+            ctx.shadowBlur = cw * 0.6;
             ctx.fillText(emoji, (seg.x + 0.5) * cw, (seg.y + 0.5) * cw);
+            ctx.shadowBlur = 0;
           }
         });
       }
@@ -634,6 +669,17 @@ function Dashboard({ progress, t }) {
   const booting = false;
   return (
     <div className="grid gap-4">
+      <div className="py-8 md:py-12 text-center">
+        <div className="font-semibold" style={{
+          fontSize: "clamp(28px,6vw,48px)",
+          letterSpacing: "-0.02em",
+          background: `linear-gradient(90deg, var(--accent) 0%, #FF6A88 45%, var(--accent-2) 100%)`,
+          WebkitBackgroundClip: 'text',
+          backgroundClip: 'text',
+          color: 'transparent'
+        }}>{t("tagline")}</div>
+      </div>
+
       <SoftCard title={t("overviewTitle")} subtitle={t("overviewSub")}>
         {booting ? (
           <div className="h-56 w-full animate-pulse rounded-xl" style={{ background: "rgba(0,0,0,0.04)" }} />
@@ -646,7 +692,7 @@ function Dashboard({ progress, t }) {
                 <YAxis tick={{ fontSize: 12 }} stroke="var(--hairline)" />
                 <RTooltip />
                 <Line type="monotone" dataKey="Cheese" stroke="var(--accent)" dot={false} strokeWidth={2} />
-                <Line type="monotone" dataKey="Quiz" stroke="#c7c7cc" dot={false} />
+                <Line type="monotone" dataKey="Quiz" stroke="var(--accent-2)" dot={false} />
                 <Line type="monotone" dataKey="Cards" stroke="#8e8e93" dot={false} />
               </LineChart>
             </ResponsiveContainer>
@@ -719,7 +765,6 @@ function SettingsPane({ vocab, setVocab, prefs, setPrefs, t }) {
           <button onClick={() => setPrefs(p => ({ ...p, themeMode: 'auto' }))} className={`px-3 py-2 min-h-[36px] rounded-full border ${prefs.themeMode==='auto' ? 'bg-[var(--accent)]/10' : ''}`} style={{ borderColor: "var(--hairline)" }} aria-label={t("themeAuto")}><MonitorSmartphone size={16} /></button>
           <button onClick={() => setPrefs(p => ({ ...p, themeMode: 'light', theme: 'light' }))} className={`px-3 py-2 min-h-[36px] rounded-full border ${prefs.themeMode==='light' ? 'bg-[var(--accent)]/10' : ''}`} style={{ borderColor: "var(--hairline)" }} aria-label={t("themeLight")}><Sun size={16} /></button>
           <button onClick={() => setPrefs(p => ({ ...p, themeMode: 'dark', theme: 'dark' }))} className={`px-3 py-2 min-h-[36px] rounded-full border ${prefs.themeMode==='dark' ? 'bg-[var(--accent)]/10' : ''}`} style={{ borderColor: "var(--hairline)" }} aria-label={t("themeDark")}><Moon size={16} /></button>
-          <button onClick={() => setPrefs(p => ({ ...p, high: !p.high }))} className={`px-3 py-2 min-h-[36px] rounded-full border ${prefs.high ? 'bg-[var(--accent)]/10' : ''}`} style={{ borderColor: "var(--hairline)" }} aria-label={t("highRead")}><Accessibility size={16} /></button>
         </div>
       } />
 
@@ -809,9 +854,12 @@ export default function App() {
   return (
     <AppShell active={active} setActive={setActive} prefs={prefs} t={t}>
       <style>{`
-        :root{--accent:${ACCENT_DEFAULT}}
+        :root{--accent:${ACCENT_DEFAULT}; --accent-2:#34C759}
         ::selection{ background: color-mix(in srgb, var(--accent) 24%, transparent); }
         body{ -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
+        button{ transition: background-color .2s, transform .06s, box-shadow .2s; }
+        button:hover{ background: color-mix(in srgb, var(--accent) 8%, transparent); }
+        button:active{ transform: translateY(1px); }
       `}</style>
       <AnimatePresence mode="wait">
         <motion.div key={active} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={{ type: "spring", stiffness: 200, damping: 28 }}>
